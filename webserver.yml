@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: "Minimaler Webserver: VPC, Subnet, SG, EC2 +AWSTemplateFormatVersion"
+
+Resources:
+  #VPC
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  #Öffentliches Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+
+  # Route Table
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  # Security Group
+  MyWebSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP access
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+  # EC2-Instanz
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0f3caa1cf4417e51b
+      InstanceType: t3.micro
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+      - !Ref MyWebSG
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<h1>Hallo von ${AWS::StackName}..das ist mein ApacheWebServer</h1>" > /var/www/html/index.html 
+      Tags:
+      - Key: Name
+        Value: MeineWebserverInstanz
+
+# Outputs: Ausgabewerte (Optional)
+Outputs:
+  WebsiteURL:
+    Description: "URL of the webserver"
+    Value:
+      Fn::Join:
+      - ""
+      - - "http://"
+        - !GetAtt
+          - MyEC2Instance
+          - PublicDnsName

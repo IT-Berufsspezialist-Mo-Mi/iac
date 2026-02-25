@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Simple S3 Bucket
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Globally unique bucket name
+
+Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+Outputs:
+  BucketName:
+    Value: !Ref MyBucket
+  BucketArn:
+    Value: !GetAtt MyBucket.Arn
